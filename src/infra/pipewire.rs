@@ -7,12 +7,13 @@ mod graph;
 mod policy;
 mod runtime;
 mod stream;
-mod transport;
 
 #[cfg(test)]
 mod live_tests;
 
-use crate::domain::routing::{CaptureConfig, StreamIdentity};
+use crate::domain::routing::CaptureConfig;
+use crate::infra::audio_transport as transport;
+use crate::infra::{ApplicationView, AudioReader, CaptureView};
 use crate::util::unpoison;
 use std::io;
 use std::path::PathBuf;
@@ -21,30 +22,7 @@ use std::sync::{Arc, RwLock, mpsc};
 use std::thread;
 use tracing::{error, info};
 
-pub use transport::{AudioReader, CapturedSpan};
-pub(crate) use transport::{AudioWake, audio_wake};
-
 type DynError = Box<dyn std::error::Error + Send + Sync>;
-
-#[cfg(test)]
-pub(crate) fn test_audio_reader() -> AudioReader {
-    transport::channel().1
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ApplicationView {
-    pub identity: StreamIdentity,
-    pub label: Arc<str>,
-    pub active: bool,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct CaptureView {
-    pub applications: Arc<[ApplicationView]>,
-    pub devices: Arc<[Arc<str>]>,
-    pub default_sink: Arc<str>,
-    pub selected_device: Option<Arc<str>>,
-}
 
 enum Command {
     Configure(CaptureConfig),
@@ -170,9 +148,11 @@ mod tests {
         let (mut reset, mut seeded) = (false, false);
         while !(reset && seeded) && Instant::now() < deadline {
             audio.drain(Instant::now(), |span| match span {
-                CapturedSpan::Reset => reset = true,
-                CapturedSpan::Silence { format, .. } => seeded |= format.channels() == 8,
-                CapturedSpan::Pcm { .. } => {}
+                crate::infra::CapturedSpan::Reset => reset = true,
+                crate::infra::CapturedSpan::Silence { format, .. } => {
+                    seeded |= format.channels() == 8
+                }
+                crate::infra::CapturedSpan::Pcm { .. } => {}
             });
             thread::sleep(Duration::from_millis(1));
         }

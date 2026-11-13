@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Maika Namuo
 
+use super::super::audio_transport::{CaptureWriter, StreamStatus, pcm_chunk};
 use super::DynError;
-use super::transport::{CaptureWriter, StreamStatus, pcm_chunk};
 use crate::dsp::{AudioFormat, ChannelPosition, SampleRate};
 use pipewire as pw;
 use pw::properties::properties;

@@ -2,7 +2,7 @@
 
 ![Demo GIF](https://github.com/user-attachments/assets/36fda58f-fe6c-4617-9a7a-ce413c1e925e)
 
-Fast and professional audio metering for Linux.
+Fast and professional audio metering for Linux and macOS.
 
 ## Quick links
 
@@ -28,12 +28,15 @@ open an issue or pull request.
 
 ### General
 
-- PipeWire audio capture
+- Audio capture
+  - Linux: PipeWire audio capture.
+  - macOS 14.2+: Core Audio process taps for selected applications or
+    output devices. macOS asks for System Audio Recording permission.
   - Per-application capture.
   - Direct device/default-sink capture with negotiated layouts of up
     to eight channels.
 - Windowing
-  - Normal desktop windows on X11 or Wayland.
+  - Desktop windows on Linux (X11 or Wayland) and macOS.
   - Wayland layer-shell "bar mode" when the compositor exposes
     `zwlr_layer_shell_v1`, anchored to the top or bottom of a given
     monitor.
@@ -102,19 +105,25 @@ open an issue or pull request.
 
 ### Prerequisites
 
-OpenMeters requires:
+On Linux, OpenMeters requires:
 
-1. A graphical Linux session on X11 or Wayland.
+1. A graphical session on X11 or Wayland.
 2. PipeWire 0.3.77 or newer, installed and running.
 3. A compatible Vulkan or OpenGL/EGL driver stack. Mesa's llvmpipe can
-   provide CPU rendering when hardware rendering is
-   unavailable. **Vulkan is recommended.**
+   provide CPU rendering when hardware rendering is unavailable.
+   **Vulkan is recommended.**
 4. For pre-built release artifacts: x86_64 GNU/Linux with `glibc` >=
    v2.39. The release workflow builds these artifacts in Ubuntu 24.04.
 
 Normal application windows are available on both X11 and Wayland. Bar
 mode additionally requires a Wayland compositor that exposes
 `zwlr_layer_shell_v1`.
+
+On macOS, OpenMeters requires macOS 14.2 or newer. Audio capture uses
+Core Audio process taps and requires **System Audio Recording** access.
+The first launch of the packaged app prompts for access; you can also
+manage it under **System Settings → Privacy & Security → System Audio
+Recording**. The bar mode is Linux-only.
 
 ### Arch Linux
 
@@ -161,13 +170,13 @@ an issue and I will try to help.
 
 ### Building from source
 
-1. Install a Rust toolchain, a C toolchain, `pkg-config`, `libclang`,
-   and native development packages for PipeWire, Wayland/X11,
-   xkbcommon, fontconfig/freetype, and the Vulkan loader/development
-   headers. PipeWire/SPA development headers must be from PipeWire
-   0.3.77 or newer. The recommended way to install Rust is
-   [rustup](https://rustup.rs/). OpenMeters currently requires the
-   Rust version declared in `Cargo.toml` or newer.
+1. Install the Rust version declared in `Cargo.toml` or newer. The
+   recommended way to install Rust is [rustup](https://rustup.rs/).
+   On Linux, also install `pkg-config`, `libclang`, and development
+   packages for PipeWire, Wayland/X11, xkbcommon, fontconfig/freetype,
+   and Vulkan. PipeWire/SPA headers must be from PipeWire 0.3.77 or
+   newer. On macOS, install the Xcode Command Line Tools; no Wayland or
+   PipeWire packages are needed.
 2. Clone the repository:
 
    ```bash
@@ -175,7 +184,7 @@ an issue and I will try to help.
    cd openmeters
    ```
 
-3. Build and run the release binary:
+3. Build and run on Linux:
 
    ```bash
    cargo build --release
@@ -187,6 +196,18 @@ an issue and I will try to help.
    ```bash
    cargo run --release
    ```
+
+   On macOS, build and launch an app bundle so macOS can request audio
+   capture permission:
+
+   ```bash
+   sh packaging/macos/build-app.sh
+   open target/OpenMeters.app
+   ```
+
+   The app bundle targets macOS 14.2 or newer. A direct `cargo run`
+   build is useful for development, but use the app bundle to grant
+   System Audio Recording permission.
 
 #### Packaging
 
@@ -223,14 +244,19 @@ reach out via E-Mail.
 
 ## Configuration
 
-On first launch, all six visuals are enabled. Application settings are
-saved to `$XDG_CONFIG_HOME/openmeters/settings.json`, or to:
+On first launch, all six visuals are enabled. On Linux, application
+settings are saved to `$XDG_CONFIG_HOME/openmeters/settings.json`, or
+to:
 
 ```text
 ~/.config/openmeters/settings.json
 ```
 
 when `XDG_CONFIG_HOME` is unset.
+
+On macOS, settings are saved to
+`~/Library/Application Support/OpenMeters/settings.json` unless an
+absolute `XDG_CONFIG_HOME` is set.
 
 `settings.json` is intentionally editable. GUI ranges are not hard
 limits, but visuals limit some values when drawn. Unsupported keys,
@@ -270,14 +296,13 @@ application?**
 A: Yes, as long as you abide by the terms of the GPL. My primary focus
 is keeping OpenMeters free and open source, not profiting from it.
 
-Q: **Will you support Windows or macOS?**
+Q: **Will you support Windows?**
 
 A: _Maybe_, but _probably not_. I'm a Linux user and have been for
 most of my life. I am not currently confident in my ability to
-maintain reliable support for either platform. That said, I aim to
-keep things modular and platform-agnostic where possible. The DSP code
-at the core of this project will run anywhere; the GUI, persistence,
-and audio backend code will not.
+maintain reliable support for Windows. macOS builds are supported from
+macOS 14.2 onward through Core Audio process taps; permission must be
+granted to the packaged app under System Audio Recording.
 
 Q: **How do I force OpenGL, Vulkan, or software rendering?**
 

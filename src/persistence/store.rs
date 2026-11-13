@@ -17,12 +17,23 @@ use tracing::warn;
 
 fn config_dir() -> PathBuf {
     // XDG: an empty or relative value is invalid and means unset.
-    std::env::var_os("XDG_CONFIG_HOME")
+    if let Some(dir) = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .filter(|dir| dir.is_absolute())
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+    {
+        return dir.join("openmeters");
+    }
+    #[cfg(target_os = "macos")]
+    let dir = std::env::var_os("HOME")
+        .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("openmeters")
+        .join("Library/Application Support/OpenMeters");
+    #[cfg(not(target_os = "macos"))]
+    let dir = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config/openmeters");
+    dir
 }
 
 /// Settings and the active theme, as a whole.

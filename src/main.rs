@@ -11,7 +11,7 @@ mod ui;
 mod util;
 mod visuals;
 
-use infra::pipewire::AudioBackend;
+use infra::AudioBackend;
 use persistence::settings::SettingsHandle;
 use std::{cell::RefCell, process::ExitCode, rc::Rc};
 use tracing::{error, info};
@@ -37,7 +37,7 @@ fn main() -> ExitCode {
     let (mut backend, capture, audio) = match AudioBackend::start(capture_config) {
         Ok(backend) => backend,
         Err(err) => {
-            error!("[capture] failed to start PipeWire backend: {err}");
+            error!("[capture] failed to start audio backend: {err}");
             return ExitCode::FAILURE;
         }
     };

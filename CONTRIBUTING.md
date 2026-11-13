@@ -105,9 +105,11 @@ rustup toolchain install 1.95
 rustup component add rustfmt clippy --toolchain 1.95
 ```
 
-You also need native development packages for PipeWire/SPA 0.3.77 or
-newer, Wayland/X11, xkbcommon, fontconfig/freetype, libclang,
-pkg-config, and Vulkan. The ignored live capture tests additionally
+On Linux, install native development packages for PipeWire/SPA 0.3.77
+or newer, Wayland/X11, xkbcommon, fontconfig/freetype, libclang,
+pkg-config, and Vulkan. On macOS, use Xcode Command Line Tools; audio
+capture requires macOS 14.2 or newer and System Audio Recording access.
+The ignored PipeWire live capture tests are Linux-only and additionally
 need `pipewire`, `pw-cli`, `pw-link`, `pw-loopback`, `pw-dump`, and
 `wireplumber` executables, plus coreutils' `timeout`.
 
@@ -128,6 +130,14 @@ cargo check --workspace --locked
 cargo run
 cargo run --release
 RUST_LOG=openmeters=debug cargo run
+```
+
+On macOS, package the binary before launching it so macOS can associate
+System Audio Recording permission with the app bundle:
+
+```bash
+sh packaging/macos/build-app.sh
+open target/OpenMeters.app
 ```
 
 For performance work you may want to use the `profiling` profile.
@@ -173,7 +183,9 @@ src/domain.rs              shared capture policy and visual identifiers
 src/dsp.rs                 AudioBlock and small DSP types
 src/meter.rs               capture timeline, silence handling, and DSP batching
 src/util/                  low-level audio math, color, and musical helpers
-src/infra/pipewire/        owned PipeWire graph, tap policy, stream, and audio transport
+src/infra/                 shared audio transport and platform backends
+src/infra/pipewire/        PipeWire graph, tap policy, and stream implementation
+src/infra/macos.rs         Core Audio process tap implementation
 src/persistence/           settings schema, lossy loading, store, themes, visual config
 src/visuals.rs             visual module declarations, option enums, widget macros
 src/visuals/               visual processors, state, render primitives, palettes, registry
@@ -187,7 +199,7 @@ Keep dependencies between these areas shallow and one-way where
 possible:
 
 - `domain`, `dsp`, and `util` should not depend on UI or PipeWire.
-- `infra` should stay focused on PipeWire graph ownership and capture.
+- `infra` owns platform audio backends and the shared capture transport.
 - `persistence` owns serialized settings and theme file behavior.
 - `visuals` owns processor/state/render code and the visual registry.
 - `ui` composes application state, settings handles, windows, pages,

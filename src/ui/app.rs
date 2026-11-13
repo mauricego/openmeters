@@ -5,7 +5,7 @@ mod message;
 mod sync;
 mod windowing;
 
-use crate::infra::pipewire::{AudioReader, AudioWake, CaptureControl, audio_wake};
+use crate::infra::{AudioReader, AudioWake, CaptureControl, audio_wake};
 use crate::meter::MeterEngine;
 use crate::persistence::settings::{
     BarAlignment, SettingsHandle, clamp_bar_height, settings_changes,
@@ -26,16 +26,18 @@ use iced::widget::{Space, container, mouse_area, row, stack, text};
 use iced::{
     Element, Length, Settings as IcedSettings, Subscription, Task, daemon as iced_daemon, window,
 };
+#[cfg(target_os = "linux")]
 use iced_exwlshell::settings::{LayerShellSettings, Settings as LayerSettings, StartMode};
-use message::{Message, app_event, shell_event, update, view};
+#[cfg(target_os = "linux")]
+use message::shell_event;
+use message::{Message, app_event, update, view};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use windowing::{
-    APP_ID, BarResizeState, MainWindow, layershell_available, open_main_window,
-    open_tool_base_window,
-};
+#[cfg(target_os = "linux")]
+use windowing::layershell_available;
+use windowing::{APP_ID, BarResizeState, MainWindow, open_main_window, open_tool_base_window};
 
 const TOAST_DISPLAY_DURATION: Duration = Duration::from_secs(2);
 const MAINTENANCE_INTERVAL: Duration = Duration::from_millis(100);
@@ -65,6 +67,7 @@ pub(crate) struct UiConfig {
 }
 
 pub(crate) fn run(config: UiConfig) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    #[cfg(target_os = "linux")]
     if layershell_available() {
         let (shell_broadcast, shell_events) = iced_exwlshell::shell::channel();
         iced_exwlshell::daemon(
@@ -91,17 +94,17 @@ pub(crate) fn run(config: UiConfig) -> Result<(), Box<dyn std::error::Error + Se
         .title(|app, window_id| Some(app.title(window_id)))
         .theme(|app: &UiApp, window_id| Some(app.theme(window_id)))
         .run()?;
-    } else {
-        iced_daemon(move || UiApp::new(config.clone(), false), update, view)
-            .settings(IcedSettings {
-                id: Some(APP_ID.into()),
-                ..Default::default()
-            })
-            .subscription(UiApp::subscription)
-            .title(UiApp::title)
-            .theme(UiApp::theme)
-            .run()?;
+        return Ok(());
     }
+    iced_daemon(move || UiApp::new(config.clone(), false), update, view)
+        .settings(IcedSettings {
+            id: Some(APP_ID.into()),
+            ..Default::default()
+        })
+        .subscription(UiApp::subscription)
+        .title(UiApp::title)
+        .theme(UiApp::theme)
+        .run()?;
     Ok(())
 }
 

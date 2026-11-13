@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Maika Namuo
 
+use super::super::audio_transport::{CaptureWriter, StreamStatus};
 use super::graph::{Graph, GraphLink, Node, Port, property};
 use super::policy::{self, LinkSpec};
 use super::stream::TapStream;
-use super::transport::{CaptureWriter, StreamStatus};
 use super::{Command, DynError, PublicState};
 use crate::domain::routing::CaptureConfig;
 use pipewire as pw;
@@ -627,7 +627,7 @@ mod tests {
         // A local socket keeps real PipeWire objects independent of the user's daemon.
         let (_peer, socket) = UnixStream::pair().unwrap();
         let core = context.connect_fd_rc(socket.into(), None).unwrap();
-        let (writer, _audio) = super::super::transport::channel();
+        let (writer, _audio) = super::super::audio_transport::channel();
         let writer = Rc::new(RefCell::new(writer));
         let dirty = Rc::new(Cell::new(true));
         let mut capture = CaptureState::new(core, Rc::clone(&writer), dirty);

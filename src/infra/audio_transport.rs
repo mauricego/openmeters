@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing::info;
 
-// Packet frame cap, independent of PipeWire's quantum.
+// Packet frame cap, independent of the capture backend's callback size.
 const BLOCK_FRAMES: usize = 256;
 const BLOCK_SAMPLES: usize = BLOCK_FRAMES * MAX_AUDIO_CHANNELS;
 // Front-packet age from its end; current activity epoch only.
@@ -388,6 +388,48 @@ impl CaptureWriter {
             }
             self.previous_timing = previous_timing;
         }
+    }
+
+    pub(super) fn push_f32(&mut self, samples: &[f32]) {
+        let Some(format) = self.format else { return };
+        let channels = format.channels();
+        let frames = samples.len() / channels;
+        if frames == 0 {
+            return;
+        }
+        let samples = &samples[..frames * channels];
+        let mut signal = samples
+            .iter()
+            .copied()
+            .any(|sample| sanitize_pcm(sample) != 0.0);
+        if self.shared.ingest() == IngestState::Dormant && !signal {
+            self.push_frames(format, frames as u64, false, |output| output.fill(0.0));
+            return;
+        }
+        let mut wake = signal && self.shared.wake_ingestion();
+        self.drop_stale_pending();
+        let previous_timing = self.previous_timing.clone();
+        let accepted = self.push_frames(format, frames as u64, true, |output| {
+            for (output, sample) in output.iter_mut().zip(samples) {
+                *output = sanitize_pcm(*sample);
+                signal |= *output != 0.0;
+            }
+        });
+        if accepted {
+            if signal && self.pending.is_some() {
+                self.shared.pending_signal.store(true, Ordering::SeqCst);
+            }
+            wake |= signal && self.shared.wake_ingestion();
+            if wake {
+                self.flush_pending();
+                self.shared.notify();
+            }
+            return;
+        }
+        if self.shared.ingest() != IngestState::Active {
+            return;
+        }
+        self.previous_timing = previous_timing;
     }
 
     pub(super) fn push_silence(&mut self, frames: u64) {

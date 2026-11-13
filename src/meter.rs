@@ -3,11 +3,11 @@
 
 //! Feeds audio and silence to visuals in timeline order.
 //!
-//! Capture stays at its negotiated PipeWire quantum. DSP work is amortized into
+//! Capture stays at its negotiated audio quantum. DSP work is amortized into
 //! sample-rate-scaled batches so compositor cadence does not become DSP cadence.
 
 use crate::dsp::{AudioFormat, MAX_AUDIO_CHANNELS, SampleRate};
-use crate::infra::pipewire::{AudioReader, CapturedSpan};
+use crate::infra::{AudioReader, CapturedSpan};
 use crate::visuals::registry::{VisualManager, VisualManagerHandle};
 use std::time::Instant;
 
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn pause_gates_capture_at_the_producer() {
         let visuals = std::rc::Rc::new(std::cell::RefCell::new(VisualManager::default()));
-        let mut meter = MeterEngine::new(crate::infra::pipewire::test_audio_reader(), visuals);
+        let mut meter = MeterEngine::new(crate::infra::test_audio_reader(), visuals);
         assert!(meter.audio.is_active());
         meter.set_paused(true);
         assert!(!meter.audio.is_active());

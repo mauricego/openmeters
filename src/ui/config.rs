@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Maika Namuo
 
 use crate::domain::routing::{CaptureMode, StreamIdentity};
-use crate::infra::pipewire::{CaptureControl, CaptureView};
+use crate::infra::{CaptureControl, CaptureView};
 use crate::persistence::settings::{
     BUILTIN_THEME, BarAlignment, BarHeight, SettingsHandle, ThemeChoice, VisualFrameRate,
     clamp_bar_height, theme_name,
@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 const GRID_COLUMNS: usize = 2;
 const MAX_DEVICE_NAME_LEN: usize = 48;
-const REGISTRY_UNAVAILABLE_MESSAGE: &str = "PipeWire unavailable; reconnecting...";
+const REGISTRY_UNAVAILABLE_MESSAGE: &str = "Audio capture unavailable; reconnecting...";
 
 #[derive(Clone, PartialEq, Eq)]
 struct DeviceOption {
@@ -197,7 +197,7 @@ pub enum ConfigMessage {
 
 pub struct ConfigPage {
     capture: CaptureControl,
-    // None while PipeWire is unreachable. Refreshed before the page is shown.
+    // None while audio capture is unavailable. Refreshed before the page is shown.
     capture_view: Option<Arc<CaptureView>>,
     visual_manager: VisualManagerHandle,
     settings: SettingsHandle,
@@ -599,7 +599,7 @@ impl ConfigPage {
             .capture
             .configure(self.settings.borrow().data.capture_config())
         {
-            tracing::error!("[ui] PipeWire capture backend is unavailable");
+            tracing::error!("[ui] audio capture backend is unavailable");
         }
     }
 }

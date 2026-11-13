@@ -10,17 +10,19 @@ use iced::event::{self, Event};
 use iced::keyboard::{self, Key};
 use iced::widget::text;
 use iced::{Element, Size, Task, mouse, touch, window};
+#[cfg(target_os = "linux")]
 use iced_exwlshell::actions::IcedXdgWindowSettings;
+#[cfg(target_os = "linux")]
 use iced_exwlshell::reexport::NewLayerShellSettings;
+#[cfg(target_os = "linux")]
 use iced_exwlshell::shell::ShellEvent;
-use iced_exwlshell::to_layer_message;
 use std::time::{Duration, Instant};
 
 // A held key repeats well within this, so a later press is fresh even if focus took the
 // release before it.
 const KEY_REPEAT_GAP: Duration = Duration::from_secs(1);
 
-#[to_layer_message(multi)]
+#[cfg_attr(target_os = "linux", iced_exwlshell::to_layer_message(multi))]
 #[derive(Debug, Clone)]
 pub(super) enum Message {
     Config(ConfigMessage),
@@ -49,14 +51,17 @@ pub(super) enum Message {
     SettingsScrolled(ScrollEvent),
 }
 
+#[cfg(target_os = "linux")]
 pub(super) fn base_window_open(settings: IcedXdgWindowSettings) -> (window::Id, Task<Message>) {
     Message::base_window_open(settings)
 }
 
+#[cfg(target_os = "linux")]
 pub(super) fn layershell_open(settings: NewLayerShellSettings) -> (window::Id, Task<Message>) {
     Message::layershell_open(settings)
 }
 
+#[cfg(target_os = "linux")]
 pub(super) fn shell_event(event: ShellEvent) -> Option<Message> {
     use BarOutputEvent as Change;
 
@@ -244,10 +249,10 @@ pub(super) fn view(app: &UiApp, window_id: window::Id) -> Element<'_, Message> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::{Message::*, *};
-    use crate::infra::pipewire::{CaptureControl, test_audio_reader};
+    use crate::infra::{CaptureControl, test_audio_reader};
     use crate::persistence::settings::{BarAlignment, SettingsHandle};
     use crate::ui::app::UiConfig;
     use crate::ui::app::windowing::{MainWindow, bar_anchor};

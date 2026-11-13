@@ -1,28 +1,38 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Maika Namuo
 
-use super::message::{self, Message};
+#[cfg(target_os = "linux")]
+use super::message;
+use super::message::Message;
 use super::{ActiveSettings, UiApp};
+#[cfg(target_os = "linux")]
+use crate::persistence::settings::BarAlignment;
 use crate::persistence::settings::{
-    BarAlignment, BarHeight, MainWindowSettings, PopoutWindowSettings, UiSettings, clamp_bar_height,
+    BarHeight, MainWindowSettings, PopoutWindowSettings, UiSettings, clamp_bar_height,
 };
 use crate::ui::widgets::scroll_glow::ScrollGlow;
 use crate::visuals::registry::{VisualContent, VisualKind};
 use iced::{Size, Task, exit, window};
+#[cfg(target_os = "linux")]
 use iced_exwlshell::reexport::{
     Anchor, KeyboardInteractivity, Layer, LayerSize, NewLayerShellSettings, OutputOption, PixelSize,
 };
 use std::collections::HashMap;
+#[cfg(target_os = "linux")]
 use wayland_client::globals::{GlobalListContents, registry_queue_init};
+#[cfg(target_os = "linux")]
 use wayland_client::protocol::wl_registry;
+#[cfg(target_os = "linux")]
 use wayland_client::{Connection, Dispatch, QueueHandle};
 
 pub(super) const APP_ID: &str = "openmeters-ui";
 const WINDOW_MIN_SIZE: Size = Size::new(200.0, 150.0);
 const TOOL_WINDOW_SIZE: Size = Size::new(480.0, 600.0);
 
+#[cfg(target_os = "linux")]
 struct LayerShellProbe;
 
+#[cfg(target_os = "linux")]
 impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for LayerShellProbe {
     fn event(
         _state: &mut Self,
@@ -35,6 +45,7 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for LayerShellProbe {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub(super) fn layershell_available() -> bool {
     let Ok(conn) = Connection::connect_to_env() else {
         return false;
@@ -48,6 +59,12 @@ pub(super) fn layershell_available() -> bool {
     })
 }
 
+#[cfg(not(target_os = "linux"))]
+pub(super) fn layershell_available() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
 pub(super) fn bar_anchor(alignment: BarAlignment) -> Anchor {
     match alignment {
         BarAlignment::Top => Anchor::Top | Anchor::Left | Anchor::Right,
@@ -65,29 +82,29 @@ fn main_window_size(settings: MainWindowSettings) -> Size {
 }
 
 fn open_base_window(
-    layershell: bool,
+    _use_layershell: bool,
     size: Size,
     decorations: bool,
 ) -> (window::Id, Task<Message>) {
-    if layershell {
+    #[cfg(target_os = "linux")]
+    if _use_layershell {
         let (width, height) = persisted_window_size(size);
         let settings = iced_exwlshell::actions::IcedXdgWindowSettings {
             size: Some(PixelSize::px(width, height)),
             client_side_decorations: !decorations,
         };
-        message::base_window_open(settings)
-    } else {
-        let (id, task) = window::open(window::Settings {
-            size,
-            min_size: Some(WINDOW_MIN_SIZE),
-            resizable: true,
-            decorations,
-            // Keep one alpha mode across base windows; visual windows need it for background opacity.
-            transparent: true,
-            ..Default::default()
-        });
-        (id, task.discard())
+        return message::base_window_open(settings);
     }
+    let (id, task) = window::open(window::Settings {
+        size,
+        min_size: Some(WINDOW_MIN_SIZE),
+        resizable: true,
+        decorations,
+        // Keep one alpha mode across base windows; visual windows need it for background opacity.
+        transparent: true,
+        ..Default::default()
+    });
+    (id, task.discard())
 }
 
 pub(super) fn open_tool_base_window(use_layershell: bool) -> (window::Id, Task<Message>) {
@@ -119,6 +136,7 @@ pub(super) fn open_main_window(
     has_bar_outputs: bool,
 ) -> (MainWindow, Task<Message>) {
     let bar = &settings.bar;
+    #[cfg(target_os = "linux")]
     if use_layershell && bar.enabled {
         if !has_bar_outputs {
             return (MainWindow::Bar(None), Task::none());
@@ -139,6 +157,8 @@ pub(super) fn open_main_window(
         });
         return (MainWindow::Bar(Some(id)), task);
     }
+    #[cfg(not(target_os = "linux"))]
+    let _ = (use_layershell, has_bar_outputs, bar);
     let size = main_window_size(settings.main_window);
     let (id, task) = open_base_window(use_layershell, size, settings.decorations);
     (MainWindow::Window(id), task)
@@ -307,6 +327,7 @@ impl UiApp {
             .edit(|s| s.visuals.popout_mut(kind).popped_out = popped_out);
     }
 
+    #[cfg(target_os = "linux")]
     fn apply_bar_layout(&self) -> Task<Message> {
         let MainWindow::Bar(Some(id)) = self.main_window else {
             return Task::none();
@@ -344,6 +365,7 @@ impl UiApp {
             return Task::none();
         }
 
+        #[cfg(target_os = "linux")]
         if self.main_window.is_bar() {
             let height = clamp_bar_height(new_size.height.round() as u32);
             self.settings_handle.observe(|s| s.bar.height = height);
@@ -375,18 +397,29 @@ impl UiApp {
 
     /// Rebuilds the main window at most once per change, or updates a bar in place.
     pub(super) fn sync_main_window(&mut self, old: &UiSettings, new: &UiSettings) -> Task<Message> {
-        let bar = self.use_layershell && new.bar.enabled;
-        let rebuild = if bar {
-            !self.main_window.is_bar() || old.bar.monitor != new.bar.monitor
-        } else {
-            self.main_window.is_bar() || old.decorations != new.decorations
-        };
-        if rebuild {
-            self.recreate_main_window()
-        } else if bar && old.bar != new.bar {
-            self.apply_bar_layout()
-        } else {
-            Task::none()
+        #[cfg(target_os = "linux")]
+        {
+            let bar = self.use_layershell && new.bar.enabled;
+            let rebuild = if bar {
+                !self.main_window.is_bar() || old.bar.monitor != new.bar.monitor
+            } else {
+                self.main_window.is_bar() || old.decorations != new.decorations
+            };
+            if rebuild {
+                self.recreate_main_window()
+            } else if bar && old.bar != new.bar {
+                self.apply_bar_layout()
+            } else {
+                Task::none()
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            if old.decorations != new.decorations {
+                self.recreate_main_window()
+            } else {
+                Task::none()
+            }
         }
     }
 }
